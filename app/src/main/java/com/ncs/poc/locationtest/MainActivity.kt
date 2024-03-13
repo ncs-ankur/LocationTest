@@ -1,12 +1,15 @@
 package com.ncs.poc.locationtest
 
 import android.Manifest
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
 import android.net.ConnectivityManager
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.widget.TextView
@@ -14,10 +17,10 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import com.ncs.poc.locationtest.receivers.LocationEnabledReceiver
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.ncs.poc.locationtest.receivers.NetworkChangeReceiver
 
-class MainActivity : AppCompatActivity(), LocationEnabledReceiver.LocationReceiverListener,
+class MainActivity : AppCompatActivity(),
     NetworkChangeReceiver.ConnectivityReceiverListener, LocationUtils.AppLocationListener {
 
     private lateinit var txtGPSLocationStatus: TextView
@@ -39,7 +42,6 @@ class MainActivity : AppCompatActivity(), LocationEnabledReceiver.LocationReceiv
     private lateinit var progressNetworkLocation: View
 
     private lateinit var networkChangeReceiver: NetworkChangeReceiver
-    private lateinit var locationEnabledReceiver: LocationEnabledReceiver
 
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -50,6 +52,10 @@ class MainActivity : AppCompatActivity(), LocationEnabledReceiver.LocationReceiv
             }
 
             permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false) -> {
+                enableLocationUpdates()
+            }
+
+            permissions.getOrDefault(Manifest.permission.ACCESS_BACKGROUND_LOCATION, false) -> {
                 enableLocationUpdates()
             }
 
@@ -107,13 +113,14 @@ class MainActivity : AppCompatActivity(), LocationEnabledReceiver.LocationReceiv
 
     override fun onStart() {
         super.onStart()
-        onGPSLocationStatusChange(locationEnabledReceiver.checkGPSLocationEnabled(this@MainActivity))
-        onNetworkLocationStatusChange(locationEnabledReceiver.checkNetworkLocationEnabled(this@MainActivity))
-        onFusedLocationStatusChange(locationEnabledReceiver.checkFusedLocationEnabled(this@MainActivity))
+        onGPSLocationStatusChange(LocationUtils.checkGPSLocationEnabled(this@MainActivity))
+        onNetworkLocationStatusChange(LocationUtils.checkNetworkLocationEnabled(this@MainActivity))
+        onFusedLocationStatusChange(LocationUtils.checkFusedLocationEnabled(this@MainActivity))
+
         onNetworkConnectionChanged(networkChangeReceiver.isConnectionAvailable(this@MainActivity))
     }
 
-    override fun onGPSLocationStatusChange(isEnabled: Boolean) {
+    private fun onGPSLocationStatusChange(isEnabled: Boolean) {
         if (isEnabled) {
             txtGPSLocationStatus.setPositiveText("Enabled")
         } else {
@@ -121,7 +128,7 @@ class MainActivity : AppCompatActivity(), LocationEnabledReceiver.LocationReceiv
         }
     }
 
-    override fun onNetworkLocationStatusChange(isEnabled: Boolean) {
+    private fun onNetworkLocationStatusChange(isEnabled: Boolean) {
         if (isEnabled) {
             txtNetworkLocationStatus.setPositiveText("Enabled")
         } else {
@@ -129,7 +136,7 @@ class MainActivity : AppCompatActivity(), LocationEnabledReceiver.LocationReceiv
         }
     }
 
-    override fun onFusedLocationStatusChange(isEnabled: Boolean) {
+    private fun onFusedLocationStatusChange(isEnabled: Boolean) {
         if (isEnabled) {
             txtFusedLocationStatus.setPositiveText("Enabled")
         } else {
@@ -177,7 +184,6 @@ class MainActivity : AppCompatActivity(), LocationEnabledReceiver.LocationReceiv
 
     private fun registerReceiver() {
         networkChangeReceiver = NetworkChangeReceiver(this)
-        locationEnabledReceiver = LocationEnabledReceiver(this)
 
         val filterConnectivityChange = IntentFilter()
         val action = ConnectivityManager.CONNECTIVITY_ACTION
@@ -186,24 +192,64 @@ class MainActivity : AppCompatActivity(), LocationEnabledReceiver.LocationReceiv
             networkChangeReceiver,
             filterConnectivityChange,
         )
-        val filter = IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION)
-        filter.addAction(Intent.ACTION_PROVIDER_CHANGED)
-        registerPublicReceiver(
-            locationEnabledReceiver,
-            filter
-        )
     }
 
     private fun unregisterReceivers() {
         unregisterPublicReceiver(networkChangeReceiver)
-        unregisterPublicReceiver(locationEnabledReceiver)
+    }
+
+    private val locationReceiver = object : BroadcastReceiver() {
+        override fun onReceive(p0: Context?, intent: Intent?) {
+            val location = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent?.getParcelableExtra("LOCATION", Location::class.java)
+            } else {
+                intent?.getParcelableExtra<Location?>("LOCATION")
+            }
+            location?.let {
+                when (it.provider) {
+                    LocationManager.GPS_PROVIDER -> {
+                        onGPSLocationChanged(it)
+                    }
+
+                    LocationManager.NETWORK_PROVIDER -> {
+                        onNetworkLocationChanged(it)
+                    }
+
+                    else -> {
+                        onFusedLocationChanged(it)
+                    }
+                }
+            }
+        }
+    }
+
+    private val providerStatusReceiver = object : BroadcastReceiver() {
+        override fun onReceive(p0: Context?, intent: Intent?) {
+            var provider = intent?.getStringExtra("PROVIDER")
+            var enabled = intent?.getBooleanExtra("ENABLED", false) ?: false
+
+            when (provider) {
+                LocationManager.GPS_PROVIDER -> {
+                    onGPSLocationStatusChange(enabled)
+                }
+
+                LocationManager.NETWORK_PROVIDER -> {
+                    onNetworkLocationStatusChange(enabled)
+                }
+
+                else -> {
+                    onFusedLocationStatusChange(enabled)
+                }
+            }
+        }
     }
 
     private fun enableLocationUpdates() {
         if (ActivityCompat.checkSelfPermission(
                 this,
                 Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+            ) != PackageManager.PERMISSION_GRANTED &&
+            ActivityCompat.checkSelfPermission(
                 this,
                 Manifest.permission.ACCESS_COARSE_LOCATION
             ) != PackageManager.PERMISSION_GRANTED
@@ -211,16 +257,44 @@ class MainActivity : AppCompatActivity(), LocationEnabledReceiver.LocationReceiv
             locationPermissionRequest.launch(
                 arrayOf(
                     Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
                 )
             )
             return
         }
-        locationUtils.enableLocationUpdates()
+
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_BACKGROUND_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            locationPermissionRequest.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                )
+            )
+            return
+        }
+
+        LocalBroadcastManager.getInstance(this@MainActivity)
+            .registerReceiver(providerStatusReceiver, IntentFilter("ACTION_PROVIDER_CHANGED"))
+
+        LocalBroadcastManager.getInstance(this@MainActivity)
+            .registerReceiver(locationReceiver, IntentFilter("ACTION_LOCATION_UPDATED"))
+
+        val intent = Intent(this, LocationManagerUpdateService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
     }
 
     private fun disableLocationUpdates() {
-        locationUtils.disableLocationUpdates()
+        LocalBroadcastManager.getInstance(this@MainActivity)
+            .unregisterReceiver(locationReceiver)
+        LocalBroadcastManager.getInstance(this@MainActivity)
+            .unregisterReceiver(providerStatusReceiver)
     }
 
     override fun onGPSLocationChanged(location: Location?) {

@@ -6,6 +6,7 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Build
+import android.util.Log
 
 class LocationUtils(context: Context, val listener: AppLocationListener) {
 
@@ -85,5 +86,57 @@ class LocationUtils(context: Context, val listener: AppLocationListener) {
 
     interface AppSingleLocationListener {
         fun onLocationReceived(location: Location?)
+    }
+
+    companion object {
+        fun checkGPSLocationEnabled(context: Context?): Boolean {
+            var isEnabled = false
+            context?.let {
+                val locationManager =
+                    context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+                var enabled = false
+                try {
+                    enabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
+                } catch (ex: Exception) {
+                    Log.d("GPS", ex.localizedMessage)
+                }
+                isEnabled = enabled
+            }
+            return isEnabled
+        }
+
+        fun checkNetworkLocationEnabled(context: Context?): Boolean {
+            var isEnabled = false
+            context?.let {
+                val locationManager =
+                    context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+                var enabled = false
+                try {
+                    enabled =
+                        locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+                } catch (ex: Exception) {
+                    Log.d("NETWORK", ex.localizedMessage)
+                }
+                isEnabled = enabled
+            }
+            return isEnabled
+        }
+
+        fun checkFusedLocationEnabled(context: Context?): Boolean {
+            var isEnabled = false
+            context?.let {
+                val locationManager =
+                    context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+                var enabled = false
+                try {
+                    enabled =
+                        locationManager.isProviderEnabled(LocationManager.FUSED_PROVIDER)
+                } catch (ex: Exception) {
+                    Log.d("FUSED", ex.localizedMessage)
+                }
+                isEnabled = enabled
+            }
+            return isEnabled
+        }
     }
 }
