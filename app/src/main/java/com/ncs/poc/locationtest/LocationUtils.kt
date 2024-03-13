@@ -8,7 +8,7 @@ import android.location.LocationManager
 import android.os.Build
 import android.util.Log
 
-class LocationUtils(context: Context, val listener: AppLocationListener) {
+class LocationUtils(context: Context, val listener: AppLocationListener? = null) {
 
     private var intervalSeconds = 3 //3 Seconds
     private var locationRefreshDistance = 5f //5 meters
@@ -16,13 +16,13 @@ class LocationUtils(context: Context, val listener: AppLocationListener) {
     private var mLocationManager: LocationManager
 
     private var gpsLocationListener =
-        LocationListener { location -> listener.onGPSLocationChanged(location) }
+        LocationListener { location -> listener?.onGPSLocationChanged(location) }
 
     private var networkLocationListener =
-        LocationListener { location -> listener.onNetworkLocationChanged(location) }
+        LocationListener { location -> listener?.onNetworkLocationChanged(location) }
 
     private var fusedLocationListener =
-        LocationListener { location -> listener.onFusedLocationChanged(location) }
+        LocationListener { location -> listener?.onFusedLocationChanged(location) }
 
     init {
         mLocationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
@@ -68,6 +68,10 @@ class LocationUtils(context: Context, val listener: AppLocationListener) {
                 { location -> listener.onLocationReceived(location) }, null
             )
         }
+    }
+
+    fun checkProviderEnabled(provider: String): Boolean {
+        return mLocationManager.isProviderEnabled(provider)
     }
 
     fun disableLocationUpdates() {
@@ -124,17 +128,20 @@ class LocationUtils(context: Context, val listener: AppLocationListener) {
 
         fun checkFusedLocationEnabled(context: Context?): Boolean {
             var isEnabled = false
-            context?.let {
-                val locationManager =
-                    context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-                var enabled = false
-                try {
-                    enabled =
-                        locationManager.isProviderEnabled(LocationManager.FUSED_PROVIDER)
-                } catch (ex: Exception) {
-                    Log.d("FUSED", ex.localizedMessage)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                context?.let {
+                    val locationManager =
+                        context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+                    var enabled = false
+                    try {
+
+                        enabled =
+                            locationManager.isProviderEnabled(LocationManager.FUSED_PROVIDER)
+                    } catch (ex: Exception) {
+                        Log.d("FUSED", ex.localizedMessage)
+                    }
+                    isEnabled = enabled
                 }
-                isEnabled = enabled
             }
             return isEnabled
         }
