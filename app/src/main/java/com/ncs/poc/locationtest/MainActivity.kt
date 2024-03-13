@@ -8,7 +8,6 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
-import android.net.ConnectivityManager
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -18,14 +17,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import com.ncs.poc.locationtest.receivers.NetworkChangeReceiver
 
-class MainActivity : AppCompatActivity(),
-    NetworkChangeReceiver.ConnectivityReceiverListener, LocationUtils.AppLocationListener {
+class MainActivity : AppCompatActivity() {
 
     private lateinit var txtGPSLocationStatus: TextView
     private lateinit var txtGPSLocation: TextView
-    private lateinit var txtNetworkStatus: TextView
     private lateinit var txtNetworkLocation: TextView
     private lateinit var txtNetworkLocationStatus: TextView
     private lateinit var txtFusedLocationStatus: TextView
@@ -40,8 +36,6 @@ class MainActivity : AppCompatActivity(),
     private lateinit var progressGPSLocation: View
     private lateinit var btnRefreshNetworkLocation: View
     private lateinit var progressNetworkLocation: View
-
-    private lateinit var networkChangeReceiver: NetworkChangeReceiver
 
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -72,7 +66,6 @@ class MainActivity : AppCompatActivity(),
 
         txtGPSLocationStatus = findViewById(R.id.txtGPSLocationStatus)
         txtGPSLocation = findViewById(R.id.txtGPSLocation)
-        txtNetworkStatus = findViewById(R.id.txtNetworkStatus)
         txtNetworkLocation = findViewById(R.id.txtNetworkLocation)
         txtNetworkLocationStatus = findViewById(R.id.txtNetworkLocationStatus)
         txtFusedLocationStatus = findViewById(R.id.txtFusedLocationStatus)
@@ -99,25 +92,25 @@ class MainActivity : AppCompatActivity(),
             refreshNetworkLocation()
         }
 
-        locationUtils = LocationUtils(this@MainActivity, this)
+        locationUtils = LocationUtils(this@MainActivity)
 
-        registerReceiver()
         enableLocationUpdates()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        unregisterReceivers()
         disableLocationUpdates()
     }
 
     override fun onStart() {
         super.onStart()
-        onGPSLocationStatusChange(LocationUtils.checkGPSLocationEnabled(this@MainActivity))
-        onNetworkLocationStatusChange(LocationUtils.checkNetworkLocationEnabled(this@MainActivity))
-        onFusedLocationStatusChange(LocationUtils.checkFusedLocationEnabled(this@MainActivity))
-
-        onNetworkConnectionChanged(networkChangeReceiver.isConnectionAvailable(this@MainActivity))
+        onGPSLocationStatusChange(locationUtils.checkProviderEnabled(LocationManager.GPS_PROVIDER))
+        onNetworkLocationStatusChange(locationUtils.checkProviderEnabled(LocationManager.NETWORK_PROVIDER))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            onFusedLocationStatusChange(locationUtils.checkProviderEnabled(LocationManager.FUSED_PROVIDER))
+        } else {
+            onFusedLocationStatusChange(false)
+        }
     }
 
     private fun onGPSLocationStatusChange(isEnabled: Boolean) {
@@ -141,14 +134,6 @@ class MainActivity : AppCompatActivity(),
             txtFusedLocationStatus.setPositiveText("Enabled")
         } else {
             txtFusedLocationStatus.setNegativeText("Disabled")
-        }
-    }
-
-    override fun onNetworkConnectionChanged(isConnected: Boolean) {
-        if (isConnected) {
-            txtNetworkStatus.setPositiveText("Connected")
-        } else {
-            txtNetworkStatus.setNegativeText("Disconnected")
         }
     }
 
@@ -180,22 +165,6 @@ class MainActivity : AppCompatActivity(),
                     onNetworkLocationChanged(location)
                 }
             })
-    }
-
-    private fun registerReceiver() {
-        networkChangeReceiver = NetworkChangeReceiver(this)
-
-        val filterConnectivityChange = IntentFilter()
-        val action = ConnectivityManager.CONNECTIVITY_ACTION
-        filterConnectivityChange.addAction(action)
-        registerPublicReceiver(
-            networkChangeReceiver,
-            filterConnectivityChange,
-        )
-    }
-
-    private fun unregisterReceivers() {
-        unregisterPublicReceiver(networkChangeReceiver)
     }
 
     private val locationReceiver = object : BroadcastReceiver() {
@@ -297,7 +266,7 @@ class MainActivity : AppCompatActivity(),
             .unregisterReceiver(providerStatusReceiver)
     }
 
-    override fun onGPSLocationChanged(location: Location?) {
+    private fun onGPSLocationChanged(location: Location?) {
         if (location != null) {
             txtGPSLocation.setPositiveText(location.getDMSFormatString())
             txtGPSAccuracy.text = location.getAccuracyString()
@@ -307,7 +276,7 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
-    override fun onNetworkLocationChanged(location: Location?) {
+    private fun onNetworkLocationChanged(location: Location?) {
         if (location != null) {
             txtNetworkLocation.setPositiveText(location.getDMSFormatString())
             txtNetworkAccuracy.text = location.getAccuracyString()
@@ -317,7 +286,7 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
-    override fun onFusedLocationChanged(location: Location?) {
+    private fun onFusedLocationChanged(location: Location?) {
         if (location != null) {
             txtFusedLocation.setPositiveText(location.getDMSFormatString())
             txtFusedAccuracy.text = location.getAccuracyString()
