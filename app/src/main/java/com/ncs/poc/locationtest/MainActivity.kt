@@ -8,17 +8,22 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.View
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import com.ncs.poc.locationtest.receivers.LocationEnabledReceiver
 
-class MainActivity : AppCompatActivity() {
+
+class MainActivity : AppCompatActivity(), LocationEnabledReceiver.LocationReceiverListener {
 
     private lateinit var txtGPSLocationStatus: TextView
     private lateinit var txtGPSLocation: TextView
@@ -37,21 +42,24 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnRefreshNetworkLocation: View
     private lateinit var progressNetworkLocation: View
 
+    private lateinit var locationEnableReceiver: LocationEnabledReceiver
+
+    private var pendingPermissionTask: (() -> Unit)? = null
+
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         when {
             permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) -> {
-                enableLocationUpdates()
+                pendingPermissionTask?.invoke()
             }
 
             permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false) -> {
-                enableLocationUpdates()
+                pendingPermissionTask?.invoke()
             }
 
             else -> {
-                Toast.makeText(this@MainActivity, "Location permission denied!", Toast.LENGTH_SHORT)
-                    .show()
+                //openLocationPermissionSetting()
             }
         }
     }
@@ -82,14 +90,19 @@ class MainActivity : AppCompatActivity() {
         progressNetworkLocation.visibility = View.GONE
 
         btnRefreshGPSLocation.setOnClickListener {
-            refreshGPSLocation()
+            whenPermissionAvailable {
+                refreshGPSLocation()
+            }
         }
         btnRefreshNetworkLocation.setOnClickListener {
-            refreshNetworkLocation()
+            whenPermissionAvailable {
+                refreshNetworkLocation()
+            }
         }
 
         locationUtils = LocationUtils(this@MainActivity)
 
+        locationEnableReceiver = LocationEnabledReceiver(this@MainActivity)
         enableLocationUpdates()
     }
 
@@ -102,6 +115,32 @@ class MainActivity : AppCompatActivity() {
         super.onStart()
         updateProviderStatus()
     }
+
+    override fun onGPSLocationStatusChange(isEnabled: Boolean) {
+        if (isEnabled) {
+            txtGPSLocationStatus.setPositiveText("Enabled")
+        } else {
+            txtGPSLocationStatus.setNegativeText("Disabled")
+        }
+    }
+
+    override fun onNetworkLocationStatusChange(isEnabled: Boolean) {
+        if (isEnabled) {
+            txtNetworkLocationStatus.setPositiveText("Enabled")
+        } else {
+            txtNetworkLocationStatus.setNegativeText("Disabled")
+        }
+    }
+
+    override fun onFusedLocationStatusChange(isEnabled: Boolean) {
+        if (isEnabled) {
+            txtFusedLocationStatus.setPositiveText("Enabled")
+        } else {
+            txtFusedLocationStatus.setNegativeText("Disabled")
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
 
     private fun updateProviderStatus() {
         onGPSLocationStatusChange(locationUtils.checkProviderEnabled(LocationManager.GPS_PROVIDER))
@@ -122,32 +161,6 @@ class MainActivity : AppCompatActivity() {
             onFusedLocationChanged(null)
         }
     }
-
-    private fun onGPSLocationStatusChange(isEnabled: Boolean) {
-        if (isEnabled) {
-            txtGPSLocationStatus.setPositiveText("Enabled")
-        } else {
-            txtGPSLocationStatus.setNegativeText("Disabled")
-        }
-    }
-
-    private fun onNetworkLocationStatusChange(isEnabled: Boolean) {
-        if (isEnabled) {
-            txtNetworkLocationStatus.setPositiveText("Enabled")
-        } else {
-            txtNetworkLocationStatus.setNegativeText("Disabled")
-        }
-    }
-
-    private fun onFusedLocationStatusChange(isEnabled: Boolean) {
-        if (isEnabled) {
-            txtFusedLocationStatus.setPositiveText("Enabled")
-        } else {
-            txtFusedLocationStatus.setNegativeText("Disabled")
-        }
-    }
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////
 
     private fun refreshGPSLocation() {
         btnRefreshGPSLocation.visibility = View.GONE
@@ -202,67 +215,84 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private val providerStatusReceiver = object : BroadcastReceiver() {
-        override fun onReceive(p0: Context?, intent: Intent?) {
-            var provider = intent?.getStringExtra("PROVIDER")
-            var enabled = intent?.getBooleanExtra("ENABLED", false) ?: false
-
-            when (provider) {
-                LocationManager.GPS_PROVIDER -> {
-                    onGPSLocationStatusChange(enabled)
-                }
-
-                LocationManager.NETWORK_PROVIDER -> {
-                    onNetworkLocationStatusChange(enabled)
-                }
-
-                else -> {
-                    onFusedLocationStatusChange(enabled)
-                }
-            }
-        }
-    }
-
-    private fun enableLocationUpdates() {
+    private fun whenPermissionAvailable(theTask: (() -> Unit)?) {
         if (ActivityCompat.checkSelfPermission(
                 this,
                 Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED &&
-            ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_COARSE_LOCATION
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            locationPermissionRequest.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION,
+            if (ActivityCompat.shouldShowRequestPermissionRationale(
+                    this,
+                    Manifest.permission.ACCESS_FINE_LOCATION
                 )
-            )
-            return
-        }
-
-        updateLastKnownLocations()
-
-        LocalBroadcastManager.getInstance(this@MainActivity)
-            .registerReceiver(providerStatusReceiver, IntentFilter("ACTION_PROVIDER_CHANGED"))
-
-        LocalBroadcastManager.getInstance(this@MainActivity)
-            .registerReceiver(locationReceiver, IntentFilter("ACTION_LOCATION_UPDATED"))
-
-        val intent = Intent(this, LocationManagerUpdateService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
+            ) {
+                showPermissionRationale {
+                    askLocationPermission()
+                }
+            } else {
+                askLocationPermission()
+            }
+            pendingPermissionTask = theTask
         } else {
-            startService(intent)
+            theTask?.invoke()
         }
+    }
+
+    private fun openLocationPermissionSetting() {
+        val i = Intent()
+        i.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+        i.addCategory(Intent.CATEGORY_DEFAULT)
+        i.setData(Uri.parse("package:" + packageName))
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        i.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
+        i.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS)
+        startActivity(i)
+    }
+
+    private fun showPermissionRationale(function: () -> Unit) {
+        AlertDialog.Builder(this)
+            .setTitle("Location permission required")
+            .setMessage("We seriously need location permission to use this app!")
+            .setPositiveButton("Fine") { p0, p1 -> function.invoke() }
+            .setNegativeButton("I don't care", null)
+            .show()
+    }
+
+    private fun askLocationPermission() {
+        locationPermissionRequest.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+            )
+        )
+    }
+
+    private fun enableLocationUpdates() {
+        whenPermissionAvailable {
+            updateLastKnownLocations()
+
+            LocalBroadcastManager.getInstance(this@MainActivity)
+                .registerReceiver(locationReceiver, IntentFilter("ACTION_LOCATION_UPDATED"))
+
+            val intent = Intent(this, LocationManagerUpdateService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+        }
+
+        registerPublicReceiver(
+            locationEnableReceiver,
+            IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION)
+        )
     }
 
     private fun disableLocationUpdates() {
         LocalBroadcastManager.getInstance(this@MainActivity)
             .unregisterReceiver(locationReceiver)
-        LocalBroadcastManager.getInstance(this@MainActivity)
-            .unregisterReceiver(providerStatusReceiver)
+
+        unregisterPublicReceiver(locationEnableReceiver)
     }
 
     private fun onGPSLocationChanged(location: Location?) {
