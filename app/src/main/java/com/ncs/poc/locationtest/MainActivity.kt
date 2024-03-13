@@ -8,13 +8,10 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import android.view.View
 import android.widget.TextView
-import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -195,7 +192,8 @@ class MainActivity : AppCompatActivity(), LocationEnabledReceiver.LocationReceiv
             val location = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 intent?.getParcelableExtra("LOCATION", Location::class.java)
             } else {
-                intent?.getParcelableExtra<Location?>("LOCATION")
+                @Suppress("DEPRECATION")
+                intent?.getParcelableExtra("LOCATION")
             }
             location?.let {
                 when (it.provider) {
@@ -238,22 +236,11 @@ class MainActivity : AppCompatActivity(), LocationEnabledReceiver.LocationReceiv
         }
     }
 
-    private fun openLocationPermissionSetting() {
-        val i = Intent()
-        i.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-        i.addCategory(Intent.CATEGORY_DEFAULT)
-        i.setData(Uri.parse("package:" + packageName))
-        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        i.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
-        i.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS)
-        startActivity(i)
-    }
-
     private fun showPermissionRationale(function: () -> Unit) {
         AlertDialog.Builder(this)
             .setTitle("Location permission required")
             .setMessage("We seriously need location permission to use this app!")
-            .setPositiveButton("Fine") { p0, p1 -> function.invoke() }
+            .setPositiveButton("Fine") { _, _ -> function.invoke() }
             .setNegativeButton("I don't care", null)
             .show()
     }
