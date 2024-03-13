@@ -88,27 +88,6 @@
                 </FrameLayout>
             </LinearLayout>
 
-
-            <com.google.android.material.divider.MaterialDivider
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_margin="4dp" />
-
-            <TextView
-                    style="@style/TextAppearance.AppCompat.SearchResult.Title"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Network connectivity status"
-                    android:layout_margin="4dp" />
-
-            <TextView
-                    android:id="@+id/txtNetworkStatus"
-                    style="@style/TextAppearance.AppCompat.SearchResult.Subtitle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_margin="4dp"
-                    tools:text="Disabled" />
-
             <com.google.android.material.divider.MaterialDivider
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
