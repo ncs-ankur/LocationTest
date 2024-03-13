@@ -51,6 +51,24 @@ class LocationUtils(context: Context, val listener: AppLocationListener) {
         }
     }
 
+    @SuppressLint("MissingPermission")
+    fun refreshLocation(context: Context, provider: String, listener: AppSingleLocationListener) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            mLocationManager.getCurrentLocation(
+                provider,
+                null,
+                context.mainExecutor
+            ) { location ->
+                listener.onLocationReceived(location)
+            }
+        } else {
+            mLocationManager.requestSingleUpdate(
+                provider,
+                { location -> listener.onLocationReceived(location) }, null
+            )
+        }
+    }
+
     fun disableLocationUpdates() {
         mLocationManager.removeUpdates(gpsLocationListener)
         mLocationManager.removeUpdates(networkLocationListener)
@@ -60,8 +78,12 @@ class LocationUtils(context: Context, val listener: AppLocationListener) {
     }
 
     interface AppLocationListener {
-        fun onGPSLocationChanged(location: Location)
-        fun onNetworkLocationChanged(location: Location)
-        fun onFusedLocationChanged(location: Location)
+        fun onGPSLocationChanged(location: Location?)
+        fun onNetworkLocationChanged(location: Location?)
+        fun onFusedLocationChanged(location: Location?)
+    }
+
+    interface AppSingleLocationListener {
+        fun onLocationReceived(location: Location?)
     }
 }

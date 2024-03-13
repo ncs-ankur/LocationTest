@@ -8,6 +8,7 @@ import android.location.Location
 import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.os.Bundle
+import android.view.View
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -31,6 +32,11 @@ class MainActivity : AppCompatActivity(), LocationEnabledReceiver.LocationReceiv
     private lateinit var txtFusedAccuracy: TextView
 
     private lateinit var locationUtils: LocationUtils
+
+    private lateinit var btnRefreshGPSLocation: View
+    private lateinit var progressGPSLocation: View
+    private lateinit var btnRefreshNetworkLocation: View
+    private lateinit var progressNetworkLocation: View
 
     private lateinit var networkChangeReceiver: NetworkChangeReceiver
     private lateinit var locationEnabledReceiver: LocationEnabledReceiver
@@ -69,6 +75,23 @@ class MainActivity : AppCompatActivity(), LocationEnabledReceiver.LocationReceiv
         txtGPSAccuracy = findViewById(R.id.txtGPSAccuracy)
         txtNetworkAccuracy = findViewById(R.id.txtNetworkAccuracy)
         txtFusedAccuracy = findViewById(R.id.txtFusedAccuracy)
+
+        btnRefreshGPSLocation = findViewById(R.id.btnRefreshGPSLocation)
+        progressGPSLocation = findViewById(R.id.progressGPSLocation)
+        btnRefreshNetworkLocation = findViewById(R.id.btnRefreshNetworkLocation)
+        progressNetworkLocation = findViewById(R.id.progressNetworkLocation)
+
+        btnRefreshGPSLocation.visibility = View.VISIBLE
+        progressGPSLocation.visibility = View.GONE
+        btnRefreshNetworkLocation.visibility = View.VISIBLE
+        progressNetworkLocation.visibility = View.GONE
+
+        btnRefreshGPSLocation.setOnClickListener {
+            refreshGPSLocation()
+        }
+        btnRefreshNetworkLocation.setOnClickListener {
+            refreshNetworkLocation()
+        }
 
         locationUtils = LocationUtils(this@MainActivity, this)
 
@@ -124,6 +147,34 @@ class MainActivity : AppCompatActivity(), LocationEnabledReceiver.LocationReceiv
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
+    private fun refreshGPSLocation() {
+        btnRefreshGPSLocation.visibility = View.GONE
+        progressGPSLocation.visibility = View.VISIBLE
+        locationUtils.refreshLocation(
+            this@MainActivity,
+            LocationManager.GPS_PROVIDER,
+            object : LocationUtils.AppSingleLocationListener {
+                override fun onLocationReceived(location: Location?) {
+                    progressGPSLocation.visibility = View.GONE
+                    btnRefreshGPSLocation.visibility = View.VISIBLE
+                    onGPSLocationChanged(location)
+                }
+            })
+    }
+
+    private fun refreshNetworkLocation() {
+        btnRefreshNetworkLocation.visibility = View.GONE
+        progressNetworkLocation.visibility = View.VISIBLE
+        locationUtils.refreshLocation(this@MainActivity,
+            LocationManager.NETWORK_PROVIDER, object : LocationUtils.AppSingleLocationListener {
+                override fun onLocationReceived(location: Location?) {
+                    btnRefreshNetworkLocation.visibility = View.VISIBLE
+                    progressNetworkLocation.visibility = View.GONE
+                    onNetworkLocationChanged(location)
+                }
+            })
+    }
+
     private fun registerReceiver() {
         networkChangeReceiver = NetworkChangeReceiver(this)
         locationEnabledReceiver = LocationEnabledReceiver(this)
@@ -172,19 +223,34 @@ class MainActivity : AppCompatActivity(), LocationEnabledReceiver.LocationReceiv
         locationUtils.disableLocationUpdates()
     }
 
-    override fun onGPSLocationChanged(location: Location) {
-        txtGPSLocation.text = location.getDMSFormatString()
-        txtGPSAccuracy.text = location.getAccuracyString()
+    override fun onGPSLocationChanged(location: Location?) {
+        if (location != null) {
+            txtGPSLocation.setPositiveText(location.getDMSFormatString())
+            txtGPSAccuracy.text = location.getAccuracyString()
+        } else {
+            txtGPSLocation.setNegativeText("(null)")
+            txtGPSAccuracy.text = ""
+        }
     }
 
-    override fun onNetworkLocationChanged(location: Location) {
-        txtNetworkLocation.text = location.getDMSFormatString()
-        txtNetworkAccuracy.text = location.getAccuracyString()
+    override fun onNetworkLocationChanged(location: Location?) {
+        if (location != null) {
+            txtNetworkLocation.setPositiveText(location.getDMSFormatString())
+            txtNetworkAccuracy.text = location.getAccuracyString()
+        } else {
+            txtNetworkLocation.setNegativeText("(null)")
+            txtNetworkAccuracy.text = ""
+        }
     }
 
-    override fun onFusedLocationChanged(location: Location) {
-        txtFusedLocation.text = location.getDMSFormatString()
-        txtFusedAccuracy.text = location.getAccuracyString()
+    override fun onFusedLocationChanged(location: Location?) {
+        if (location != null) {
+            txtFusedLocation.setPositiveText(location.getDMSFormatString())
+            txtFusedAccuracy.text = location.getAccuracyString()
+        } else {
+            txtFusedLocation.setNegativeText("(null)")
+            txtFusedAccuracy.text = ""
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
