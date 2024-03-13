@@ -8,12 +8,12 @@
 
     <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="match_parent">
 
         <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:padding="8dp"
+                android:layout_height="wrap_content"
+                android:padding="12dp"
                 android:orientation="vertical">
 
             <TextView
@@ -218,6 +218,42 @@
                     android:layout_margin="4dp"
                     android:textColor="@color/colorInfo"
                     android:text="Fused Location a location service which combines. > GPS location and network location to achieve balance between battery. > consumption and accuracy." />
+
+            <com.google.android.material.divider.MaterialDivider
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="4dp" />
+
+            <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="4dp"
+                    android:orientation="vertical">
+
+                <TextView
+                        style="@style/TextAppearance.Material3.BodySmall"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="POC developed by"
+                        android:textColor="@color/colorNeutral"
+                        android:gravity="center" />
+
+                <TextView
+                        style="@style/TextAppearance.Material3.LabelSmall"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:textColor="@color/colorInfo"
+                        android:text="Ankur Pandya" />
+
+                <TextView
+                        style="@style/TextAppearance.Material3.LabelSmall"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/colorInfo"
+                        android:gravity="center"
+                        android:text="www.ncs.co" />
+            </LinearLayout>
 
         </LinearLayout>
 

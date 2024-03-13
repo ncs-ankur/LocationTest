@@ -49,10 +49,6 @@ class MainActivity : AppCompatActivity() {
                 enableLocationUpdates()
             }
 
-            permissions.getOrDefault(Manifest.permission.ACCESS_BACKGROUND_LOCATION, false) -> {
-                enableLocationUpdates()
-            }
-
             else -> {
                 Toast.makeText(this@MainActivity, "Location permission denied!", Toast.LENGTH_SHORT)
                     .show()
@@ -104,12 +100,26 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
+        updateProviderStatus()
+    }
+
+    private fun updateProviderStatus() {
         onGPSLocationStatusChange(locationUtils.checkProviderEnabled(LocationManager.GPS_PROVIDER))
         onNetworkLocationStatusChange(locationUtils.checkProviderEnabled(LocationManager.NETWORK_PROVIDER))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             onFusedLocationStatusChange(locationUtils.checkProviderEnabled(LocationManager.FUSED_PROVIDER))
         } else {
             onFusedLocationStatusChange(false)
+        }
+    }
+
+    private fun updateLastKnownLocations() {
+        onGPSLocationChanged(locationUtils.getLastKnownLocation(LocationManager.GPS_PROVIDER))
+        onNetworkLocationChanged(locationUtils.getLastKnownLocation(LocationManager.NETWORK_PROVIDER))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            onFusedLocationChanged(locationUtils.getLastKnownLocation(LocationManager.FUSED_PROVIDER))
+        } else {
+            onFusedLocationChanged(null)
         }
     }
 
@@ -232,18 +242,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        if (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_BACKGROUND_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            locationPermissionRequest.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_BACKGROUND_LOCATION
-                )
-            )
-            return
-        }
+        updateLastKnownLocations()
 
         LocalBroadcastManager.getInstance(this@MainActivity)
             .registerReceiver(providerStatusReceiver, IntentFilter("ACTION_PROVIDER_CHANGED"))

@@ -74,6 +74,11 @@ class LocationUtils(context: Context, val listener: AppLocationListener? = null)
         return mLocationManager.isProviderEnabled(provider)
     }
 
+    @SuppressLint("MissingPermission")
+    fun getLastKnownLocation(provider: String): Location? {
+        return mLocationManager.getLastKnownLocation(provider)
+    }
+
     fun disableLocationUpdates() {
         mLocationManager.removeUpdates(gpsLocationListener)
         mLocationManager.removeUpdates(networkLocationListener)
